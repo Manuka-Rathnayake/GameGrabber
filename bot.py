@@ -4,6 +4,33 @@ from dotenv import load_dotenv
 import requests
 import json
 from epicstore_api.api import EpicGamesStoreAPI
+import schedule
+import time
+import pytz
+from datetime import datetime, timedelta
+from apscheduler.schedulers.background import BackgroundScheduler
+
+scheduler = BackgroundScheduler()
+scheduler.start()
+
+current_time = datetime.utcnow()
+next_thursday = current_time + timedelta(days=(3 - current_time.weekday()) % 7)
+next_thursday = next_thursday.replace(hour=20, minute=40, second=0, microsecond=0)
+
+
+def run_free_games_check():
+     free_games = get_free_games()
+     free_game_titles = get_free_game_titles(free_games)
+
+     if free_game_titles:
+        response = "\n".join(free_game_titles)
+        channel = bot.get_channel(1144557263151956062) 
+        bot.loop.create_task(channel.send(f"This week free games:\n{response}"))
+
+
+
+scheduler.add_job(run_free_games_check, 'interval', weeks=1, start_date=next_thursday)
+
 
 def get_free_games(allow_countries: str = None):
     api = EpicGamesStoreAPI()
@@ -19,7 +46,6 @@ def get_free_game_titles(free_games_data):
         if categories and categories[0].get('path') == 'freegames':
             title = game['title']
             game_title.append(title)
-            print("Free Game:", title)
     return game_title
 
 
@@ -34,6 +60,7 @@ bot = discord.Client(intents=discord.Intents().all())
 @bot.event 
 async def on_ready():
     print('We have logged in as {0.user}'.format(bot))
+    
 
 
 @bot.event
@@ -78,4 +105,6 @@ async def on_message(message):
 
 
 bot.run(Discord_TOKEN)
-
+while True:
+    schedule.run_pending()
+    time.sleep(1)
